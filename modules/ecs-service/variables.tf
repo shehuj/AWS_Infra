@@ -33,7 +33,7 @@ variable "subnet_ids" {
 }
 
 variable "capacity_provider_strategy" {
-  description = "Capacity provider strategy. Empty uses the cluster default."
+  description = "Capacity provider strategy. Pass the cluster default explicitly rather than leaving it empty: ECS copies the default onto the service, which otherwise shows as drift."
   type = list(object({
     capacity_provider = string
     weight            = number

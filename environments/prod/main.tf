@@ -122,11 +122,13 @@ module "service" {
   writable_paths           = each.value.writable_paths
   task_role_policy_json    = each.value.task_role_policy_json
 
-  desired_count              = each.value.desired_count
-  min_capacity               = each.value.min_capacity
-  max_capacity               = each.value.max_capacity
-  requests_per_target        = each.value.requests_per_target
-  capacity_provider_strategy = each.value.capacity_provider_strategy
+  desired_count       = each.value.desired_count
+  min_capacity        = each.value.min_capacity
+  max_capacity        = each.value.max_capacity
+  requests_per_target = each.value.requests_per_target
+  # ECS copies the cluster default onto services that omit a strategy, so pass it
+  # explicitly to keep config and live state in agreement.
+  capacity_provider_strategy = length(each.value.capacity_provider_strategy) > 0 ? each.value.capacity_provider_strategy : var.default_capacity_provider_strategy
 
   enable_execute_command = each.value.enable_execute_command
   exec_log_group_arn     = module.ecs_cluster.exec_log_group_arn
