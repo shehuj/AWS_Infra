@@ -1,0 +1,84 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["**.tf", "**.tfvars", "**.hcl", ".github/workflows/terraform.yml"]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.14"
+
+      - name: fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: validate
+        run: |
+          for dir in bootstrap environments/*/; do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - name: test (mocked provider, no AWS credentials)
+        run: terraform -chdir=environments/dev test
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: |
+          tflint --init --config="$PWD/.tflint.hcl"
+          for dir in bootstrap environments/*/ modules/*/; do
+            tflint --chdir="$dir" --config="$PWD/.tflint.hcl"
+          done
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+
+  # Plans need AWS access. Configure an OIDC role per environment
+  # (no long-lived keys), then uncomment.
+  # plan:
+  #   needs: static-checks
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #     pull-requests: write
+  #   strategy:
+  #     matrix:
+  #       environment: [dev, prod]
+  #   environment: ${{ matrix.environment }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+  #         aws-region: us-east-1
+  #     - uses: hashicorp/setup-terraform@v3
+  #     - run: terraform -chdir=environments/${{ matrix.environment }} init -backend-config=backend.hcl
+  #     - run: terraform -chdir=environments/${{ matrix.environment }} plan -input=false -lock=false

@@ -42,3 +42,13 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+# Saved plan files
+*.tfplan
+tfplan
+
+# Environment configuration is non-sensitive and reviewed via PR; secrets are
+# referenced by Secrets Manager / SSM ARN, never stored in tfvars.
+!environments/*/terraform.tfvars
+
+# Keep provider lock files committed for reproducible builds, except in reusable modules
+modules/**/.terraform.lock.hcl
